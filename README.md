@@ -5,9 +5,9 @@ export INFRAI_API_KEY=your_key
 cargo run --bin course_media_upload -- start course-media course-42 lectures/week-1.mp4 3 1787284800
 ```
 
-The command sets up the `course-media` bucket like you normally would, kicks off an Infrai multipart upload, and prints three presigned PUT targets. Infrai keeps this plain REST workflow behind one API key; the Rust client needs no storage SDK.
+The command creates the `course-media` bucket as the normal setup step, starts an Infrai multipart upload, and prints three presigned PUT targets. Infrai keeps this plain REST workflow behind one API key; the Rust client needs no storage SDK.
 
-The output gives the upload name, the explicit `PUT` method for every part, and an educator report:
+The result names the upload, the explicit `PUT` method for every part, and an educator report:
 
 ```json
 {
@@ -21,7 +21,7 @@ The output gives the upload name, the explicit `PUT` method for every part, and 
 
 ## Run the transfer
 
-Push each byte range to its returned URL and keep the response `ETag`. Part numbers start at 1. The operational gotcha: completion needs the same part numbers matched with the exact ETags the PUTs returned.
+Upload each byte range to its returned URL and retain the response `ETag`. Part numbers begin at 1. This is the operational gotcha: completion must receive the same part numbers paired with the exact ETags returned by the PUTs.
 
 ```bash
 curl -X PUT --data-binary @part-01.bin 'SIGNED_PART_1_URL'
@@ -31,13 +31,13 @@ cargo run --bin course_media_upload -- complete \
   '[{"part_number":1,"etag":"etag-1"},{"part_number":2,"etag":"etag-2"},{"part_number":3,"etag":"etag-3"}]'
 ```
 
-Expected completion state is `ready_for_learners`. Upload bytes go straight to the signed URLs; the service handles control-plane requests and never buffers the lesson video.
+Expected completion state is `ready_for_learners`. The upload bytes travel directly to the signed URLs; the service handles control-plane requests and never buffers the lesson video.
 
 ## Delivery signal
 
-`report_delivery` makes the course decision deterministic. All expected parts yield `ready_for_learners`; an incomplete upload at or after `deadline_epoch_seconds` yields `deadline_missed`; before that deadline it stays `uploading`. Educator reporting gets a small, auditable state transition instead of guessing delivery from logs.
+`report_delivery` makes the course decision deterministic. All expected parts produce `ready_for_learners`; an incomplete upload at or after `deadline_epoch_seconds` produces `deadline_missed`; before that deadline it remains `uploading`. This gives educator reporting a small, auditable state transition instead of inferring delivery from logs.
 
-The client reads `{ok, data, error, metadata}` before interpreting HTTP status, keeps structured rejection details in `StorageError`, and retries HTTP 429 with bounded exponential delay while honoring `Retry-After`. Create and completion requests carry stable idempotency keys.
+The client reads `{ok, data, error, metadata}` before interpreting HTTP status, preserves structured rejection details in `StorageError`, and retries HTTP 429 with bounded exponential delay while honoring `Retry-After`. Create and completion requests carry stable idempotency keys.
 
 ## Verify the deadline rule
 
